@@ -6,13 +6,13 @@
 #   original latex output which is oververbosified.
 #
 # == Examples
-#   ./rtex view  #equivalent to just ./rtex
-#   ./rtex clean
-#   ./rtex tex
+#   ./rtex view     # compiles and opens the pdf, equivalent to just ./rtex
+#   ./rtex clean    # removes all generated files
+#   ./rtex tex      # compiles the latex sources
+#   ./rtex count    # gives different word approximations of the latex file
 #
 # == Usage 
 #   rtex [options] [view|compile|tex|clean] 
-#
 #   For help use: rtex -h
 #
 # == Options
@@ -20,6 +20,7 @@
 #   -v, --version       Display the version, then exit
 #   -q, --quiet         Output as little as possible, overrides verbose
 #   -V, --verbose       Output lists all errors, overrides quiet
+#   --figures           Set the figures dir, default is './figures'
 #   --hack              Open this script for direct changes in the sources
 #
 # == Author
@@ -29,7 +30,6 @@
 # ============================================================================
 # CHANGE THESE PROPERTIES FOR YOUR PROJECT
 FIGURES = 'figures'    # not yet used
-SOURCE  = 'paper.tex'
 GARBAGE = 'log aux out blg pdfsync synctex.gz'
 
 # ============================================================================
@@ -46,7 +46,7 @@ require 'open3'
 # ============================================================================
 #TODO track changed files and only recompile then...
 class App
-    VERSION = '0.0.5'
+    VERSION = '0.0.6'
     
     attr_reader :options
         
@@ -64,19 +64,19 @@ class App
 
     # ------------------------------------------------------------------------
     def initialize(arguments, stdin)
-        @arguments = arguments
-        @stdin     = stdin
-        @action    = :compile
+        @arguments           = arguments
+        @stdin               = stdin
+        @action              = :compile
         # Set defaults
-        @options = OpenStruct.new
+        @options             = OpenStruct.new
         @options.verbose     = false
         @options.quiet       = false
         @options.interaction = 'nonstopmode'
         @options.garbage     = GARBAGE
         @options.figures     = FIGURES
-        self.source! SOURCE
     end
 
+    # ------------------------------------------------------------------------
     def source!(sourceFile)
         @options.source      = sourceFile
         @options.sourceBase  = sourceFile.sub(/\.\w+$/,'')
@@ -84,6 +84,7 @@ class App
     end
 
 
+    # ------------------------------------------------------------------------
     def check_source
         if not File.exist?(@options.source)
             print "File doesn't exist: ".redb, @options.source, "\n"
@@ -122,8 +123,7 @@ class App
     
     # ------------------------------------------------------------------------
     def compile
-        #TODO only compile as much as necessary
-        self.clean
+        #TODO only compile as much as necessary, at most 3 times
         self.check_commands
         self.check_source
         baseCommand = self.create_compile_baseCommand
@@ -131,7 +131,10 @@ class App
         formatter = TexOutputFormatter.new(`#{baseCommand}`, 
                                            @options.verbose, @options.quiet,
                                            @options.source)
-        formatter.print if not @options.quite
+        if not formatter.hasCitationWarnings?
+            formatter.print if not @options.quite
+            return
+        end
         # 2/4
         self.bibtex
         # 3/4 second run
@@ -207,11 +210,12 @@ class App
         def parsed_options?
             # Specify options
             opts = OptionParser.new 
-            opts.on('-v', '--version')    { self.output_version; exit 0 }
-            opts.on('-h', '--help')       { self.output_help; exit 0 }
-            opts.on('-V', '--verbose')    { @options.verbose = true }
-            opts.on('-q', '--quiet')      { @options.quiet = true }
-            opts.on('--hack')             { @action = :hack }
+            opts.on('-v', '--version') { self.output_version; exit 0 }
+            opts.on('-h', '--help')    { self.output_help;    exit 0 }
+            opts.on('-V', '--verbose') { @options.verbose        = true }
+            opts.on('-q', '--quiet')   { @options.quiet          = true }
+            opts.on('--figures PATH')  { |path| @options.figures = path }
+            opts.on('--hack')          { @action                 = :hack }
 
             opts.parse!(@arguments) rescue return false
             self.process_options
@@ -237,7 +241,10 @@ class App
             if not @arguments.empty?
                 self.source! @arguments.shift
             end
-            #TODO automatically extract e single .tex file from the current DIR
+            if @options.source.nil?
+                self.extract_source_from_current_dir
+            end
+            self.error('Source file not set!') if @options.source.nil?
         end
         
         # ---------------------------------------------------------------------
@@ -255,6 +262,25 @@ class App
         end
         
         # ---------------------------------------------------------------------
+        def extract_source_from_current_dir
+            texFiles = Dir['*.tex']
+            return if texFiles.empty?
+            return self.source! texFiles.first if texFiles.length == 1
+            self.source! self.promptChoice texFiles
+        end
+
+        def promptChoice(args)
+            for i in 1..args.length:
+                puts "[#{i}] #{args[i-1]}"
+            end
+            choice = nil
+            while choice.nil?
+                print "Which is the source file?[number]: "
+                choice = args[gets.chomp.to_i-1]
+            end
+            return choice
+        end
+
         def check_commands
             missing = []
             'pdflatex bibtex'.split.each { |c|
@@ -277,9 +303,10 @@ class App
 
         # ---------------------------------------------------------------------
         def has_command?(command)	
-            # disable warnings during the gettext checking, so we get only errors in
-		    # stderr. Warnings can cause problems during the detection, for example
-		    # ( warning: Insecure world writable dir /some/path in PATH, mode 040777 )
+            # disable warnings during the script checking, so we get only
+            # errors in stderr. Warnings can cause problems during the
+            # detection, for example ( warning: Insecure world writable dir
+            # /some/path in PATH, mode 040777 )
 		    @warn = $-v
 		    $-v   = nil
             Open3.popen3(command+' --help') { |stdin, stdout, stderr|
@@ -317,7 +344,9 @@ class TexOutputFormatter
         interestingLimits   = 0 if @quiet
         uninterestingLimits = 0
         uninterestingLimits = 50 if @verbose
-        return if not @errorGroups.nil?
+        return unless @errorGroups.nil?
+        @citationWarnings = CitationWarning.new(interestingLimits)
+
         @errorGroups = [
 
           PDFVersionMismatchWarning.new(uninterestingLimits),
@@ -336,8 +365,10 @@ class TexOutputFormatter
                          /Warning:.*?float specifier changed to/,
                          /float specifier .*/, 
                          uninterestingLimits),
-
+        
           FontWarning.new(uninterestingLimits),
+          
+          @citationWarnings,
 
           TexError.new('Undefined Control Sequence', 
                         /! Undefined control /,
@@ -359,6 +390,11 @@ class TexOutputFormatter
         ]
     end
 
+    # ------------------------------------------------------------------------
+    def hasCitationWarnings?
+        not @citationWarnings.empty?
+    end
+    
     # ------------------------------------------------------------------------
     def print
         self.parse if not @parsed
@@ -537,7 +573,7 @@ end
 class CitationWarning < TexWarning
     def initialize(limits=10)
         super('Citation Warnings',    
-              /natbib Warning: Citation/,
+              /natbib Warning: Citation|Citation /,
               /[^ ]+ on page [0-9]+ undefined/, limits)
     end
 end
@@ -647,17 +683,6 @@ end
 # ===========================================================================
 
 if __FILE__ == $0
-    #TODO remove 
-    def dir
-        begin 
-            return File.readlink $0
-        rescue
-            return $0
-        end
-    end
-    DIR = Dir.chdir File.dirname dir
-    
-    # Create and run the application
     app = App.new(ARGV, STDIN)
     app.run
 end
