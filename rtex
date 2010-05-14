@@ -1,0 +1,665 @@
+#!/usr/bin/env ruby 
+
+# == Synopsis 
+#   rtex is script simplifying the compilation of latex files by creating
+#   proper human-readable error output with repeating patters. Unlike the
+#   original latex output which is oververbosified.
+#
+# == Examples
+#   ./rtex view  #equivalent to just ./rtex
+#   ./rtex clean
+#   ./rtex tex
+#
+# == Usage 
+#   rtex [options] [view|compile|tex|clean] 
+#
+#   For help use: rtex -h
+#
+# == Options
+#   -h, --help          Displays help message
+#   -v, --version       Display the version, then exit
+#   -q, --quiet         Output as little as possible, overrides verbose
+#   -V, --verbose       Output lists all errors, overrides quiet
+#   --hack              Open this script for direct changes in the sources
+#
+# == Author
+#   Camillo Bruni 
+#
+
+# ============================================================================
+# CHANGE THESE PROPERTIES FOR YOUR PROJECT
+FIGURES = 'figures'    # not yet used
+SOURCE  = 'paper.tex'
+GARBAGE = 'log aux out blg pdfsync synctex.gz'
+
+# ============================================================================
+
+require 'optparse' 
+require 'rdoc/usage'
+require 'ostruct'
+require 'date'
+require 'logger'  
+require 'open3'
+#require 'ruby-debug'
+#Debugger.start(:post_mortem => true)
+
+# ============================================================================
+#TODO track changed files and only recompile then...
+class App
+    VERSION = '0.0.5'
+    
+    attr_reader :options
+        
+    # mapping of input command shortcuts and method names
+    VALID_ACTIONS = Hash[ 
+        "view",     :view,
+        "compile",  :compile,
+        "tex",      :compile,
+        "count",    :count,
+        "clean",    :clean,
+        "bibtex",   :bibtex,
+        "bib",      :bibtex,
+        "v",        :view,
+    ]
+
+    # ------------------------------------------------------------------------
+    def initialize(arguments, stdin)
+        @arguments = arguments
+        @stdin     = stdin
+        @action    = :compile
+        # Set defaults
+        @options = OpenStruct.new
+        @options.verbose     = false
+        @options.quiet       = false
+        @options.interaction = 'nonstopmode'
+        @options.garbage     = GARBAGE
+        @options.figures     = FIGURES
+        self.source! SOURCE
+    end
+
+    def source!(sourceFile)
+        @options.source      = sourceFile
+        @options.sourceBase  = sourceFile.sub(/\.\w+$/,'')
+        @options.output      = @options.sourceBase + '.pdf'
+    end
+
+
+    def check_source
+        if not File.exist?(@options.source)
+            print "File doesn't exist: ".redb, @options.source, "\n"
+            exit 1
+        end
+    end
+
+    # ------------------------------------------------------------------------
+    def run
+        if self.parsed_options? && self.arguments_valid? 
+            self.process_arguments            
+            self.process_command
+        else
+            self.output_usage
+        end
+    end
+    
+    # ------------------------------------------------------------------------
+    def hack
+        if ENV['EDITOR']
+            editor = ENV['EDITOR']
+        else
+            editor = 'vim'
+        end
+        cmd = "sudo #{editor} #{__FILE__}"
+        print cmd
+        exec(cmd)
+    end
+
+    # ------------------------------------------------------------------------
+    def clean
+        @options.garbage.split.each { |f|
+            `rm -f #{@options.sourceBase}.#{f}`
+        }
+    end
+    
+    # ------------------------------------------------------------------------
+    def compile
+        #TODO only compile as much as necessary
+        self.clean
+        self.check_commands
+        self.check_source
+        baseCommand = self.create_compile_baseCommand
+        # 1/4 first run interactive... ignoring cite/ref errors
+        formatter = TexOutputFormatter.new(`#{baseCommand}`, 
+                                           @options.verbose, @options.quiet,
+                                           @options.source)
+        formatter.print if not @options.quite
+        # 2/4
+        self.bibtex
+        # 3/4 second run
+        if not system("#{baseCommand} > /dev/null 2>&1")
+            puts '', "! Could not create PDF !".redb, ''
+            exit 1
+        end
+        # 4/4 looking for ref/cite errors
+        formatter = TexOutputFormatter.new(`#{baseCommand}`, 
+                            @options.verbose, @options.quiet, @options.source,
+                            [ReferenceWarning.new, CitationWarning.new, 
+                             OtherWarning.new])
+        formatter.print if not @options.quite
+    end
+
+    # ------------------------------------------------------------------------
+    def bibtex
+        if not File.exist?(@options.sourceBase + '.aux')
+            return self.compile
+        end
+        `bibtex #{@options.sourceBase + '.aux'}`
+    end
+
+    # ------------------------------------------------------------------------
+    def view
+        self.compile
+        open = nil
+        if RUBY_PLATFORM.include? "linux"
+            'gnome-open evince kpdf Xpdf'.split.each { |c|
+                if self.has_command? c
+                    open = c
+                    break
+                end
+            }
+        elsif RUBY_PLATFORM.include? "darwin"
+            open = 'open'
+        end
+        if open.nil?
+            puts ''
+            print 'no command found to open'.redb @options.output
+            puts "!\n"
+        end
+        system("#{open} #{@options.output}")
+    end
+
+    # ------------------------------------------------------------------------
+    def count
+        @options.quite = true
+        self.compile
+        puts 'Sources'.red + ":"
+        self.print_wc_results `wc #{@options.source}`
+        puts 'PDFtoText'.red + ":"
+        #TODO create a tmp file instead of saving locally 
+        self.print_wc_results `pdftotext -enc UTF-8 -nopgbrk #{@options.output} - | wc`
+        `rm -f #{@options.sourceBase}.txt`
+        if self.has_command? 'texcount'
+            puts 'texcount'.red + ":"
+            puts `texcount -relaxed -sum #{@options.source}`
+        end
+    end
+
+    def print_wc_results(result)
+        result = result.split()[0..2]
+        max    = result.map{|l| l.size}.max 
+        puts "    #{result[0].rjust(max).yellow} lines"
+        puts "    #{result[1].rjust(max).yellow} words"
+        puts "    #{result[2].rjust(max).yellow} characters"
+
+    end
+
+    # ------------------------------------------------------------------------
+    protected
+        def parsed_options?
+            # Specify options
+            opts = OptionParser.new 
+            opts.on('-v', '--version')    { self.output_version; exit 0 }
+            opts.on('-h', '--help')       { self.output_help; exit 0 }
+            opts.on('-V', '--verbose')    { @options.verbose = true }
+            opts.on('-q', '--quiet')      { @options.quiet = true }
+            opts.on('--hack')             { @action = :hack }
+
+            opts.parse!(@arguments) rescue return false
+            self.process_options
+            true      
+        end
+        
+        # Performs post-parse processing on options
+        def process_options
+            @options.verbose = false if @options.quiet
+        end
+
+        # True if required arguments were provided
+        def arguments_valid?
+            return false if not @action and not VALID_ACTIONS.keys.include? @arguments[0]
+            true 
+        end
+    
+        # Setup the arguments
+        def process_arguments
+            if not @action or VALID_ACTIONS.keys.include? @arguments[0]
+                @action = VALID_ACTIONS[@arguments.shift]
+            end
+            if not @arguments.empty?
+                self.source! @arguments.shift
+            end
+            #TODO automatically extract e single .tex file from the current DIR
+        end
+        
+        # ---------------------------------------------------------------------
+        def output_help
+            self.output_version
+            RDoc::usage #exits app
+        end
+        
+        def output_usage
+            RDoc::usage('usage') # gets usage from comments above
+        end
+        
+        def output_version
+            puts "#{File.basename(__FILE__)} version #{VERSION}"
+        end
+        
+        # ---------------------------------------------------------------------
+        def check_commands
+            missing = []
+            'pdflatex bibtex'.split.each { |c|
+                missing.push(c) unless self.has_command? c
+            }
+            if not missing.empty?
+                print 'Missing commands for running the script: '.redb
+                puts missing.join(', ')
+                if RUBY_PLATFORM.include? "linux"
+                    puts 'install latex with your favorite package manager'
+                elsif RUBY_PLATFORM.include? "darwin"
+                    puts 'install the latest latex from http://www.tug.org/mactex'
+                end
+            end
+        end
+
+        def process_command
+            self.send @action
+        end
+
+        # ---------------------------------------------------------------------
+        def has_command?(command)	
+            # disable warnings during the gettext checking, so we get only errors in
+		    # stderr. Warnings can cause problems during the detection, for example
+		    # ( warning: Insecure world writable dir /some/path in PATH, mode 040777 )
+		    @warn = $-v
+		    $-v   = nil
+            Open3.popen3(command+' --help') { |stdin, stdout, stderr|
+                return stderr.read.length == 0
+            }
+		    $-v   = @warn
+            return true
+        end
+
+        # ---------------------------------------------------------------------
+        def create_compile_baseCommand
+            "pdflatex -synctex=1 --interaction #{@options.interaction} '#{@options.source}'"
+        end
+
+end
+
+# ============================================================================
+
+class TexOutputFormatter
+    def initialize(texOutput, verbose=false, quiet=false,  source=nil,
+                  errorGroups=nil)
+        #TODO add arg check
+        @texOutput     = texOutput
+        @source        = source
+        @totalWarnings = 0
+        @parsed        = false
+        @verbose       = verbose
+        @quiet         = quiet
+        @errorGroups   = errorGroups
+        self.initialize_error_groups
+    end
+
+    def initialize_error_groups
+        interestingLimits   = 50
+        interestingLimits   = 0 if @quiet
+        uninterestingLimits = 0
+        uninterestingLimits = 50 if @verbose
+        return if not @errorGroups.nil?
+        @errorGroups = [
+
+          PDFVersionMismatchWarning.new(uninterestingLimits),
+
+          TexWarning.new('Underfull lines',      
+                         /Underfull.*/, 
+                         /\(badness [0-9]+\) in \w+/, 
+                         uninterestingLimits),
+
+          TexWarning.new('Overfull lines',       
+                         /Overfull.*/, 
+                         /\w+ \(.*?\) in \w+/, 
+                         uninterestingLimits),
+
+          TexWarning.new('Float changes',        
+                         /Warning:.*?float specifier changed to/,
+                         /float specifier .*/, 
+                         uninterestingLimits),
+
+          FontWarning.new(uninterestingLimits),
+
+          TexError.new('Undefined Control Sequence', 
+                        /! Undefined control /,
+                        /\\.*/, interestingLimits),
+          
+          TexError.new('LaTeX error', /! LaTeX Error/, /.*/, interestingLimits),
+
+          TexWarning.new('Missing Parenthesis', /! File ended /, /.*/, 
+                          interestingLimits),
+
+          TexWarning.new('File not Found',       
+                         /Warning: File/,
+                         /[^ ]+ not found/, 
+                         interestingLimits),
+                         
+          MultipleLabelWarning.new(@source, interestingLimits),
+
+          TexError.new('Other Errors', /^! /, /.*/, interestingLimits),
+        ]
+    end
+
+    # ------------------------------------------------------------------------
+    def print
+        self.parse if not @parsed
+        @errorGroups.each { |group|
+            if not group.empty?
+                 Kernel.print group.to_s
+            end
+        }
+    end
+    
+    # ------------------------------------------------------------------------
+    protected
+        def parse
+            lineNumberPattern = /lines ([0-9\-]+)/
+            @parsed           = true
+            mergedLine        = ""
+            lines             = @texOutput.each.entries
+            lines.each_with_index { |line,index|
+                #magic to unwrap the autowrapped lines from latex.. silly
+                mergedLine += line.chomp
+                if line.size == 80
+                    next
+                elsif line.chomp.start_with? "! Undefined"
+                    next
+                end
+                # start of the actual error parsing
+                line    = mergedLine
+                handled = false
+                @errorGroups.each { |group|
+                    break if group.handle(line, index, lines)
+                }
+                #Kernel.print line, "\n"
+                #Kernel.print line, "\n" if not handled
+                mergedLine = ""
+            }
+        end
+end
+
+# ============================================================================
+class TexWarning
+    attr_reader :limit
+
+    def initialize(name, pattern, printPattern=/.*/, limit=10, 
+                   additionaInputLines=0)
+        @name                     = name
+        @pattern                  = pattern
+        @printPattern             = printPattern
+        @errors                   = []
+        @limit                    = limit
+        @maxLinesWidth            = 0
+        @additionaInputLines      = additionaInputLines
+    end
+
+    def handle(string, index, lines)
+        if not string.match(@pattern) or string.empty?
+            return false
+        end
+        string         = self.expand_input(string, index, lines)
+        line           = self.extract_line(string, index, lines)
+        self.add_error(line, string)
+        true
+    end
+
+    def expand_input(string, index, lines)
+        return string if @additionaInputLines == 0
+        to = [index + @additionaInputLines, lines.size].min
+        return lines[index..to].to_s
+    end
+
+    def extract_line(string, index, lines)
+        if string =~ /(?:line(?:s)? |l.)([0-9\-]+)/
+            return $1
+        end
+        return "-"
+    end
+
+    def add_error(line, string)
+        return if self.has_error?(line, string)
+        @errors.push([line.to_s, string.to_s])
+        @maxLinesWidth = [@maxLinesWidth, line.size].max
+    end
+
+    def has_error?(line, string)
+        @errors.each { |e|
+            return true if e[0] == line and e[1] == string
+        }
+        false
+    end
+
+    def to_s
+        if self.empty?
+            return ""
+        end
+        self.sort
+        limit = [@limit, @errors.size].min 
+        str   = @name.redb + " [#{@errors.size}]: "
+        str   += "\n" #if self.size > 1 and limit > 0
+        limit.times { |i|
+            str += "    #{self.format_error(@errors[i][0], @errors[i][1])}\n"
+        }
+        if @limit < @errors.size and @limit != 0
+            str += "    #{"...".ljust(@maxLinesWidth)} ...\n"
+        end
+        #str += "\n"
+        str
+    end
+
+    def format_error(line, string)
+        message = self.format_warning_message(line, string)
+        "#{line.ljust(@maxLinesWidth).yellow} #{message.to_s.chomp}"
+    end
+
+    def format_warning_message(line, string)
+        if @printPattern.instance_of? Proc
+            puts self.class, @name
+            return @printPattern.call(line, string)  
+        end
+        matched = @printPattern.match string
+        return string if not matched
+        return matched
+    end
+
+    def sort
+        # magic from
+        # http://www.bofh.org.uk/2007/12/16/comprehensible-sorting-in-ruby
+        # for number sensible sorting
+        @errors.sort_by {|k| 
+            k.to_s.split(/((?:(?:^|\s)[-+])?(?:\.\d+|\d+(?:\.\d+?(?:[eE]\d+)?(?:$|(?![eE\.])))?))/ms).
+                map {|v| Float(v) rescue v.downcase}
+        }
+    end
+
+    def size
+        @errors.size
+    end
+    
+    def empty?
+        self.size == 0
+    end
+end
+
+class OtherWarning < TexWarning
+    def initialize(limits=10)
+        super('Other Warnings', /LaTeX Warning:/, 
+              /[^(LaTeX Warning)].*/, limits)
+    end
+end
+
+class PDFVersionMismatchWarning < TexWarning
+    def initialize(limits=10)
+        super('PDF Version mismatches', /PDF version/, /found PDF .*/, limits)
+    end
+
+    def format_warning_message(line, string)
+        result = string.match(/found PDF version <(.*?)>.*?<(.*?)>/)
+        "found #{result[1]} instead of #{result[2]}"
+    end
+
+    def extract_line(string, index, lines)
+        /file (.*?)\):/.match(string)[1]
+    end
+end
+
+class FontWarning < TexWarning
+    def initialize(limits=10)
+        super('Font Shape Warnings', /Font Warning: Font shape /, /.*/, limits, 1)
+    end
+    def format_warning_message(line, message)
+        message.sub(/\(Font\)\s+/, '').
+            sub("\n", ', ').
+            sub(", Font shape", ',').
+            match(/Font shape (.*?) on input/)[1]
+    end
+end
+
+class CitationWarning < TexWarning
+    def initialize(limits=10)
+        super('Citation Warnings',    
+              /natbib Warning: Citation/,
+              /[^ ]+ on page [0-9]+ undefined/, limits)
+    end
+end
+
+class ReferenceWarning < TexWarning
+    def initialize(limits=1)
+        super('Reference Warnings',   
+              /Warning: Reference/,
+              /[^ ]+ on page [0-9]+ undefined/, limits)
+    end
+end
+
+class MultipleLabelWarning < TexWarning
+    def initialize(source, limits=40)
+        super('Multiply defined Labels', /LaTeX Warning: Label.*? multiply/, 
+              /.*/, limits)
+        @source = source
+    end
+  
+    def format_warning_message(line, string)
+        string.match(/Label `(.*?)' /)[1]
+    end
+
+    def extract_line(string, index, lines)
+        label = self.format_warning_message(0, string)
+        `sed -ne /\label{#{label}}/= #{@source}`.split.join(',')
+    end
+
+end
+
+class TexError < TexWarning
+    def initialize(name, pattern, printPattern=/[^!].*/, limit=10)
+        super(name, pattern, printPattern, limit)
+    end
+
+    def extract_line(string, index, lines)
+        match =  /(?:line(?:s)? |l.)([0-9\-]+( \\.*)?)/
+        if string =~ match           
+            return $1
+        end
+        (index+1).upto(lines.size-1) { |i|
+            return "-" if lines[i].start_with? "!"
+            if lines[i] =~ match
+                return $1
+            end
+        }
+        return "-"
+    end
+end
+# ===========================================================================
+
+def color_terminal?
+    [/linux/, /xterm.*/, /rxvt.*/].each { |m|
+        return true if ENV['TERM'] =~ m
+    }
+    return false
+end
+
+def colorize(text, color_code)
+  return "\033#{color_code}#{text}\033[0m" if color_terminal?()
+  return text
+end
+
+class String
+    def red
+        colorize(self, "[31m")
+    end  
+
+    def redb
+        colorize(self, "[31;1m")
+    end
+
+    def green
+        colorize(self, "[32m")
+    end
+
+    def greenb
+        colorize(self, "[32;1m")
+    end
+
+    def yellow
+        colorize(self, "[33m")
+    end
+
+    def yellowb
+        colorize(self, "[33;1m")
+    end
+
+    def pink
+        colorize(self, "[35m")
+    end
+
+    def pinkb
+        colorize(self, "[35;1m")
+    end
+
+    def cyan
+        colorize(self, "[36m")
+    end
+
+    def cyanb
+        colorize(self, "[36;1m")
+    end
+
+end
+
+# ===========================================================================
+
+if __FILE__ == $0
+    #TODO remove 
+    def dir
+        begin 
+            return File.readlink $0
+        rescue
+            return $0
+        end
+    end
+    DIR = Dir.chdir File.dirname dir
+    
+    # Create and run the application
+    app = App.new(ARGV, STDIN)
+    app.run
+end
+
+
