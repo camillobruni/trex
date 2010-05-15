@@ -123,7 +123,6 @@ class App
     
     # ------------------------------------------------------------------------
     def compile
-        #TODO only compile as much as necessary, at most 3 times
         self.check_commands
         self.check_source
         baseCommand = self.create_compile_baseCommand
@@ -131,22 +130,22 @@ class App
         formatter = TexOutputFormatter.new(`#{baseCommand}`, 
                                            @options.verbose, @options.quiet,
                                            @options.source)
-        if not formatter.hasCitationWarnings?
+        if not formatter.hasCitationWarnings? and
+           not formatter.hasReferenceWarnings?
             formatter.print if not @options.quite
             return
         end
-        # 2/4
-        self.bibtex
+        # 2/4 bibtex on citation warnings
+        self.bibtex if formatter.hasCitationWarnings?
         # 3/4 second run
         if not system("#{baseCommand} > /dev/null 2>&1")
-            puts '', "! Could not create PDF !".redb, ''
-            exit 1
+             "\n! Could not create PDF !".error
         end
         # 4/4 looking for ref/cite errors
         formatter = TexOutputFormatter.new(`#{baseCommand}`, 
-                            @options.verbose, @options.quiet, @options.source,
-                            [ReferenceWarning.new, CitationWarning.new, 
-                             OtherWarning.new])
+                                           @options.verbose, @options.quiet, 
+                                           @options.source)
+        formatter.add OtherWarning.new
         formatter.print if not @options.quite
     end
 
@@ -155,7 +154,10 @@ class App
         if not File.exist?(@options.sourceBase + '.aux')
             return self.compile
         end
-        `bibtex #{@options.sourceBase + '.aux'}`
+        warning = BibtexWarning.new()
+        warning.handle(`bibtex #{@options.sourceBase + '.aux'}`)
+        puts warning.to_s unless warning.empty?
+        
     end
 
     # ------------------------------------------------------------------------
@@ -173,9 +175,7 @@ class App
             open = 'open'
         end
         if open.nil?
-            puts ''
-            print 'no command found to open'.redb @options.output
-            puts "!\n"
+            "\n no command found to open #{ @options.output} !\n".error
         end
         system("#{open} #{@options.output}")
     end
@@ -244,10 +244,12 @@ class App
             if @options.source.nil?
                 self.extract_source_from_current_dir
             end
-            self.error('Source file not set!') if @options.source.nil?
+            'Source file not set!'.error if @options.source.nil?
         end
         
         # ---------------------------------------------------------------------
+        
+        
         def output_help
             self.output_version
             RDoc::usage #exits app
@@ -345,10 +347,10 @@ class TexOutputFormatter
         uninterestingLimits = 0
         uninterestingLimits = 50 if @verbose
         return unless @errorGroups.nil?
-        @citationWarnings = CitationWarning.new(interestingLimits)
 
+        @citationWarnings  = CitationWarning.new(interestingLimits)
+        @referenceWarnings = ReferenceWarning.new(interestingLimits)
         @errorGroups = [
-
           PDFVersionMismatchWarning.new(uninterestingLimits),
 
           TexWarning.new('Underfull lines',      
@@ -368,7 +370,7 @@ class TexOutputFormatter
         
           FontWarning.new(uninterestingLimits),
           
-          @citationWarnings,
+          @citationWarnings, @referenceWarnings,
 
           TexError.new('Undefined Control Sequence', 
                         /! Undefined control /,
@@ -392,10 +394,21 @@ class TexOutputFormatter
 
     # ------------------------------------------------------------------------
     def hasCitationWarnings?
+        self.parse if not @parsed
         not @citationWarnings.empty?
+    end
+
+    def hasReferenceWarnings?
+        self.parse if not @parsed
+        not @referenceWarnings.empty?
     end
     
     # ------------------------------------------------------------------------
+    
+    def add(handler)
+        @errorGroups.push handler
+    end
+
     def print
         self.parse if not @parsed
         @errorGroups.each { |group|
@@ -448,12 +461,12 @@ class TexWarning
         @additionaInputLines      = additionaInputLines
     end
 
-    def handle(string, index, lines)
+    def handle(string, index=nil, lines=nil)
         if not string.match(@pattern) or string.empty?
             return false
         end
-        string         = self.expand_input(string, index, lines)
-        line           = self.extract_line(string, index, lines)
+        string = self.expand_input(string, index, lines)
+        line   = self.extract_line(string, index, lines)
         self.add_error(line, string)
         true
     end
@@ -570,6 +583,14 @@ class FontWarning < TexWarning
     end
 end
 
+class BibtexWarning < TexWarning
+    def initialize(limits=10)
+        super('Bibtex Warnings',    
+              /I found no/,
+              /I f.*? command/, limits)
+    end
+end
+
 class CitationWarning < TexWarning
     def initialize(limits=10)
         super('Citation Warnings',    
@@ -638,6 +659,11 @@ def colorize(text, color_code)
 end
 
 class String
+    def error(exitValue=1)
+        puts self.redb
+        exit exitValue unless exitValue.nil?
+    end
+
     def red
         colorize(self, "[31m")
     end  
