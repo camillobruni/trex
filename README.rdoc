@@ -13,7 +13,7 @@ to compile and view the generated pdf. If there are multiple files +rtex+ will
 prompt for the correct one.
 
 == Installation
-Just put +rtex+ in your executable path, for instance (+/usr/local/bin+).
+Just put +rtex+ in your executable path, for instance ( +/usr/local/bin+ ).
 
 == Why rtex?
 ratex was too long.
@@ -24,11 +24,11 @@ either)
 
 
 == Executable
-  Usage: 
+ Usage: 
     rtex [options] [view|compile|tex|clean] 
     For help use: rtex -h
 
-  Options:
+ Options:
     -h, --help          Displays help message
     -v, --version       Display the version, then exit
     -q, --quiet         Output as little as possible, overrides verbose
