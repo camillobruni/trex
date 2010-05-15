@@ -3,17 +3,17 @@
 == Summary
 
 Have you ever been annoyed by the endless lasting stream of warnings and errors
-of pdflatex? Have you ever been annoyed by the inconsistent labelling of the 
-erroneous line? Rtex is the solution for commandline pdflatex compilation
+of +pdflatex+? Have you ever been annoyed by the inconsistent labelling of the 
+erroneous line? *Rtex* is the solution for commandline +pdflatex+ compilation
 
 == Usage
 If you have only one tex file in the current dir then you can simply do:
    rtex view
-to compile and view the generated pdf. If there are multiple files rtex will
+to compile and view the generated pdf. If there are multiple files +rtex+ will
 prompt for the correct one.
 
 == Installation
-Just put rtex in your executable path, for instance (/usr/local/bin).
+Just put +rtex+ in your executable path, for instance (+/usr/local/bin+).
 
 == Why rtex?
 ratex was too long.
