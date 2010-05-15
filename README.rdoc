@@ -1,0 +1,38 @@
+= RTEX
+
+== Summary
+
+Have you ever been annoyed by the endless lasting stream of warnings and errors
+of pdflatex? Have you ever been annoyed by the inconsistent labelling of the 
+erroneous line? Rtex is the solution for commandline pdflatex compilation
+
+== Usage
+If you have only one tex file in the current dir then you can simply do:
+   rtex view
+to compile and view the generated pdf. If there are multiple files rtex will
+prompt for the correct one.
+
+== Installation
+Just put rtex in your executable path, for instance (/usr/local/bin).
+
+== Why rtex?
+ratex was too long.
+
+== Why ratex?
+Dunno, maybe because ruby is japanese? (no offense guys, I can't speek chinese
+either)
+
+
+== Executable
+  Usage: 
+    rtex [options] [view|compile|tex|clean] 
+    For help use: rtex -h
+
+  Options:
+    -h, --help          Displays help message
+    -v, --version       Display the version, then exit
+    -q, --quiet         Output as little as possible, overrides verbose
+    -V, --verbose       Output lists all errors, overrides quiet
+    --figures           Set the figures dir, default is './figures'
+    --hack              Open this script for direct changes in the sources
+
