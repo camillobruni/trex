@@ -29,7 +29,7 @@
 
 # ============================================================================
 # CHANGE THESE PROPERTIES FOR YOUR PROJECT
-SOURCE  = 'paper.tex'
+SOURCE  = nil
 FIGURES = 'figures'    # not yet used
 GARBAGE = 'log aux out blg pdfsync synctex.gz'
 
