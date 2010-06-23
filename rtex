@@ -644,7 +644,7 @@ class MissingParenthesisWarning < TexWarning
         matches = @sourceContents.match(errorSource)
         (0..matches.size-1).each { |i|
             to = matches.begin(i)
-            linenumber = @sourceContents[0..to].scan("\n").size
+            linenumber = @sourceContents[0..to].scan("\n").size + 1
             lineNumbers.push(linenumber)
         }
         lineNumbers.join(',')
