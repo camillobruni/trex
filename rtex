@@ -42,9 +42,9 @@ require 'date'
 require 'logger'  
 require 'open3'
 
-require 'ruby-debug' 
+#require 'ruby-debug' 
 #Debugger.start(:post_mortem => true)
-Debugger.start()
+#Debugger.start()
 
 # ============================================================================
 #TODO track changed files and only recompile then...
@@ -754,8 +754,6 @@ end
 # ===========================================================================
 
 if __FILE__ == $0
-    
-    require 'ruby-prof'
     app = App.new(ARGV, STDIN)
     app.run
 end
