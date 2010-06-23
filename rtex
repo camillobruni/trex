@@ -29,6 +29,7 @@
 
 # ============================================================================
 # CHANGE THESE PROPERTIES FOR YOUR PROJECT
+SOURCE  = 'paper.tex'
 FIGURES = 'figures'    # not yet used
 GARBAGE = 'log aux out blg pdfsync synctex.gz'
 
@@ -40,8 +41,10 @@ require 'ostruct'
 require 'date'
 require 'logger'  
 require 'open3'
-#require 'ruby-debug'
+
+require 'ruby-debug' 
 #Debugger.start(:post_mortem => true)
+Debugger.start()
 
 # ============================================================================
 #TODO track changed files and only recompile then...
@@ -130,16 +133,26 @@ class App
         formatter = TexOutputFormatter.new(`#{baseCommand}`, 
                                            @options.verbose, @options.quiet,
                                            @options.source)
-        if not formatter.hasCitationWarnings? and
-           not formatter.hasReferenceWarnings?
+        if not formatter.hasCitationWarnings? \
+           and not formatter.hasReferenceWarnings?
             formatter.print if not @options.quite
-            return
+            return true
         end
         # 2/4 bibtex on citation warnings
-        self.bibtex if formatter.hasCitationWarnings?
+        if formatter.hasCitationWarnings? and not self.bibtex \
+           and not @options.quite
+            # obviously something went wrong in either compiling bibtex or the
+            # latex file itself. Print everything except for reference and 
+            # citation warnings
+            errorGroups = formatter.errorGroups
+            errorGroups.delete formatter.referenceWarnings
+            errorGroups.delete formatter.citationWarnings
+            formatter.print
+        end
         # 3/4 second run
         if not system("#{baseCommand} > /dev/null 2>&1")
              "\n! Could not create PDF !".error
+             return false
         end
         # 4/4 looking for ref/cite errors
         formatter = TexOutputFormatter.new(`#{baseCommand}`, 
@@ -147,6 +160,7 @@ class App
                                            @options.source)
         formatter.add OtherWarning.new
         formatter.print if not @options.quite
+        return true
     end
 
     # ------------------------------------------------------------------------
@@ -157,7 +171,7 @@ class App
         warning = BibtexWarning.new()
         warning.handle(`bibtex #{@options.sourceBase + '.aux'}`)
         puts warning.to_s unless warning.empty?
-        
+        return warning.empty?
     end
 
     # ------------------------------------------------------------------------
@@ -240,6 +254,8 @@ class App
             end
             if not @arguments.empty?
                 self.source! @arguments.shift
+            else
+                self.source! SOURCE
             end
             if @options.source.nil?
                 self.extract_source_from_current_dir
@@ -328,6 +344,9 @@ end
 # ============================================================================
 
 class TexOutputFormatter
+    attr_reader :errorGroups, :citationWarnings, :referenceWarnings
+    attr_writer :errorGroups
+
     def initialize(texOutput, verbose=false, quiet=false,  source=nil,
                   errorGroups=nil)
         #TODO add arg check
@@ -376,10 +395,10 @@ class TexOutputFormatter
                         /! Undefined control /,
                         /\\.*/, interestingLimits),
           
-          TexError.new('LaTeX error', /! LaTeX Error/, /.*/, interestingLimits),
-
-          TexWarning.new('Missing Parenthesis', /! File ended /, /.*/, 
-                          interestingLimits),
+          TexError.new('LaTeX error', /! LaTeX Error/, /.*/, 
+                        interestingLimits),
+          
+          MissingParenthesisWarning.new(@source, interestingLimits),
 
           TexWarning.new('File not Found',       
                          /Warning: File/,
@@ -607,6 +626,32 @@ class ReferenceWarning < TexWarning
     end
 end
 
+
+class MissingParenthesisWarning < TexWarning
+    def initialize(source, limits=10)    
+        super('Missing Parenthesis', 
+              /File ended /, /[^! ].*/, 
+              limits)
+        @source = source
+        @sourceContents = File.read(source)
+    end
+    
+    def extract_line(string, index, lines)
+        label = self.format_warning_message(0, string)
+        errorSource = Regexp.escape(lines[index - 1].strip()[0..-6])
+        errorSource.gsub!('\\ ', '\s*') # make sure we can match newlines
+        lineNumbers = []
+        matches = @sourceContents.match(errorSource)
+        (0..matches.size-1).each { |i|
+            to = matches.begin(i)
+            linenumber = @sourceContents[0..to].scan("\n").size
+            lineNumbers.push(linenumber)
+        }
+        lineNumbers.join(',')
+    end
+
+end
+
 class MultipleLabelWarning < TexWarning
     def initialize(source, limits=40)
         super('Multiply defined Labels', /LaTeX Warning: Label.*? multiply/, 
@@ -709,6 +754,8 @@ end
 # ===========================================================================
 
 if __FILE__ == $0
+    
+    require 'ruby-prof'
     app = App.new(ARGV, STDIN)
     app.run
 end
