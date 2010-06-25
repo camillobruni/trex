@@ -254,7 +254,7 @@ class App
             end
             if not @arguments.empty?
                 self.source! @arguments.shift
-            else
+            elsif not SOURCE.nil?
                 self.source! SOURCE
             end
             if @options.source.nil?
