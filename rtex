@@ -282,6 +282,9 @@ class App
         # ---------------------------------------------------------------------
         def extract_source_from_current_dir
             texFiles = Dir['*.tex']
+            texFiles = texFiles.select { |file|
+                File.read(file).match(/\\documentclass.*?\{.*?\}/)
+            }
             return if texFiles.empty?
             return self.source! texFiles.first if texFiles.length == 1
             self.source! self.promptChoice texFiles
