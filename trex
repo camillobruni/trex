@@ -89,10 +89,15 @@ class App
 
     # ------------------------------------------------------------------------
     def check_source
-        if not File.exist?(@options.source)
-            print "File doesn't exist: ".redb, @options.source, "\n"
-            exit 1
+        return if File.exist?(@options.source)
+        if not @options.source.end_with? "tex"
+            @options.source += '.' if not @options.source.end_with? '.'
+            @options.source += 'tex'
+            self.source! @options.source
         end
+        return if File.exist?(@options.source)
+        print "File doesn't exist: ".redb, @options.source, "\n"
+        exit 1
     end
 
     # ------------------------------------------------------------------------
@@ -147,7 +152,9 @@ class App
         end
         # 3/4 second run
         if not system("#{baseCommand} > /dev/null 2>&1")
-             "\n! Could not create PDF !".error
+            formatter.print
+            "\n! Could not create PDF !".error
+            return false
         end
         # 4/4 looking for ref/cite errors
         formatter = TexOutputFormatter.new(`#{baseCommand}`, 
@@ -184,7 +191,7 @@ class App
             open = 'open'
         end
         if open.nil?
-            "\n no command found to open #{ @options.output} !\n".error
+            "\n no command found to open #{ @options.output} !\n".error 1 
         end
         system("#{open} #{@options.output}")
     end
@@ -255,7 +262,7 @@ class App
             if @options.source.nil?
                 self.extract_source_from_current_dir
             end
-            'Source file not set!'.error if @options.source.nil?
+            'Source file not set!'.error 1 if @options.source.nil?
         end
         
         # ---------------------------------------------------------------------
@@ -385,10 +392,15 @@ class TexOutputFormatter
                          /float specifier .*/, 
                          uninterestingLimits),
         
+
           FontWarning.new(uninterestingLimits),
           
           @citationWarnings, @referenceWarnings,
 
+          TooManyWarning.new(interestingLimits),
+
+          RepeatedPageNumberWarning.new(interestingLimits),
+          
           TexError.new('Undefined Control Sequence', 
                         /! Undefined control /,
                         /\\.*/, interestingLimits),
@@ -397,6 +409,8 @@ class TexOutputFormatter
                         interestingLimits),
           
           MissingParenthesisWarning.new(@source, interestingLimits),
+
+          PharagraphEndedWarning.new(@source, interestingLimits),
 
           TexWarning.new('File not Found',       
                          /Warning: File/,
@@ -588,6 +602,35 @@ class PDFVersionMismatchWarning < TexWarning
     end
 end
 
+class TooManyWarning < TexWarning
+    def initialize(limits=10)
+        super('Too Many XYZ Warning', /Too many /, /^l\.[0-9]+ (.*)/, limits)
+        @additionaInputLines = 10
+    end
+
+    def format_warning_message(line, string)
+        @printPattern.match(string)[1]
+    end
+end
+
+
+class RepeatedPageNumberWarning < TexWarning
+    def initialize(limits=1)
+        super('PDF Repeated Page Number',   
+              /destination with the same identifier \(name\{page\./)
+        @additionaInputLines = 4
+        @limit = limit
+    end
+
+    def format_warning_message(line, string)
+        match = /^l\.[0-9]+ (.*\n.*)/.match(string)[1]
+        match.gsub!(/\s*\n\s*/, '')
+        name = /^(.*)\)/.match(string)[1]
+        "#{name} near: #{match}.\n    #{' '*Math.log(line.to_i).floor}try using plainpages=false or pdfpagelabels in hyperref"
+    end
+end
+
+
 class FontWarning < TexWarning
     def initialize(limits=10)
         super('Font Shape Warnings', /Font Warning: Font shape /, /.*/, limits, 1)
@@ -624,7 +667,6 @@ class ReferenceWarning < TexWarning
     end
 end
 
-
 class MissingParenthesisWarning < TexWarning
     def initialize(source, limits=10)    
         super('Missing Parenthesis', 
@@ -647,7 +689,30 @@ class MissingParenthesisWarning < TexWarning
         }
         lineNumbers.join(',')
     end
+end
 
+class PharagraphEndedWarning < TexWarning
+    def initialize(source, limits=10)    
+        super('Runaway Argument', 
+              /! Pharagraph ended /, /[^! ].*/, 
+              limits)
+        @source = source
+        #@sourceContents = File.read(source)
+    end
+    
+    def extract_line__(string, index, lines)
+        label = self.format_warning_message(0, string)
+        errorSource = Regexp.escape(lines[index - 1].strip()[0..-6])
+        errorSource.gsub!('\\ ', '\s*') # make sure we can match newlines
+        lineNumbers = []
+        matches = @sourceContents.match(errorSource)
+        (0..matches.size-1).each { |i|
+            to = matches.begin(i)
+            linenumber = @sourceContents[0..to].scan("\n").size + 1
+            lineNumbers.push(linenumber)
+        }
+        lineNumbers.join(',')
+    end
 end
 
 class MultipleLabelWarning < TexWarning
@@ -702,7 +767,7 @@ def colorize(text, color_code)
 end
 
 class String
-    def error(exitValue=1)
+    def error(exitValue=nil)
         puts self.redb
         exit exitValue unless exitValue.nil?
     end
