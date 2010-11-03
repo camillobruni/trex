@@ -1,21 +1,21 @@
-= RTEX
+= TREX
 
 == Summary
 
 Have you ever been annoyed by the endless lasting stream of warnings and errors
 of +pdflatex+? Have you ever been annoyed by the inconsistent labelling of the 
-erroneous line? *Rtex* is the solution for commandline +pdflatex+ compilation
+erroneous line? *Trex* is the solution for commandline +pdflatex+ compilation
 
 == Usage
 If you have only one tex file in the current dir then you can simply do:
-   rtex view
-to compile and view the generated pdf. If there are multiple files +rtex+ will
+   trex view
+to compile and view the generated pdf. If there are multiple files +trex+ will
 prompt for the correct one.
 
 == Installation
-Just put +rtex+ in your executable path, for instance (<tt>/usr/local/bi</tt>).
+Just put +trex+ in your executable path, for instance (<tt>/usr/local/bi</tt>).
 
-== Why rtex?
+== Why trex?
 ratex was too long.
 
 == Why ratex?
@@ -25,8 +25,8 @@ either)
 
 == Executable
  Usage: 
-    rtex [options] [view|compile|tex|clean] 
-    For help use: rtex -h
+    trex [options] [view|compile|tex|clean] 
+    For help use: trex -h
 
  Options:
     -h, --help          Displays help message
