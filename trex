@@ -49,12 +49,12 @@ require 'open3'
 # ============================================================================
 #TODO track changed files and only recompile then...
 class App
-    VERSION = '0.0.6'
+    VERSION = '0.0.7'
     
     attr_reader :options
         
     # mapping of input command shortcuts and method names
-    VALID_ACTIONS = Hash[ 
+    VALID_ACTIONS = { 
         "view",     :view,
         "compile",  :compile,
         "tex",      :compile,
@@ -63,7 +63,7 @@ class App
         "bibtex",   :bibtex,
         "bib",      :bibtex,
         "v",        :view,
-    ]
+    }
 
     # ------------------------------------------------------------------------
     def initialize(arguments, stdin)
@@ -107,11 +107,7 @@ class App
     
     # ------------------------------------------------------------------------
     def hack
-        if ENV['EDITOR']
-            editor = ENV['EDITOR']
-        else
-            editor = 'vim'
-        end
+        editor = ENV['EDITOR'] || "vim"
         cmd = "sudo #{editor} #{__FILE__}"
         print cmd
         exec(cmd)
@@ -135,12 +131,12 @@ class App
                                            @options.source)
         if not formatter.hasCitationWarnings? \
            and not formatter.hasReferenceWarnings?
-            formatter.print if not @options.quite
+            formatter.print unless @options.quiet
             return true
         end
         # 2/4 bibtex on citation warnings
         if formatter.hasCitationWarnings? and not self.bibtex \
-           and not @options.quite
+           and not @options.quiet
             # obviously something went wrong in either compiling bibtex or the
             # latex file itself. Print everything except for reference and 
             # citation warnings
@@ -152,14 +148,13 @@ class App
         # 3/4 second run
         if not system("#{baseCommand} > /dev/null 2>&1")
              "\n! Could not create PDF !".error
-             return false
         end
         # 4/4 looking for ref/cite errors
         formatter = TexOutputFormatter.new(`#{baseCommand}`, 
                                            @options.verbose, @options.quiet, 
                                            @options.source)
         formatter.add OtherWarning.new
-        formatter.print if not @options.quite
+        formatter.print if not @options.quiet
         return true
     end
 
@@ -196,7 +191,7 @@ class App
 
     # ------------------------------------------------------------------------
     def count
-        @options.quite = true
+        @options.quiet = true
         self.compile
         puts 'Sources'.red + ":"
         self.print_wc_results `wc #{@options.source}`
@@ -416,12 +411,12 @@ class TexOutputFormatter
 
     # ------------------------------------------------------------------------
     def hasCitationWarnings?
-        self.parse if not @parsed
+        self.parse unless @parsed
         not @citationWarnings.empty?
     end
 
     def hasReferenceWarnings?
-        self.parse if not @parsed
+        self.parse unless @parsed
         not @referenceWarnings.empty?
     end
     
@@ -432,7 +427,7 @@ class TexOutputFormatter
     end
 
     def print
-        self.parse if not @parsed
+        self.parse unless @parsed
         @errorGroups.each { |group|
             if not group.empty?
                  Kernel.print group.to_s
