@@ -19,7 +19,7 @@ Just put +trex+ in your executable path, for instance (<tt>/usr/local/bi</tt>).
 ratex was too long.
 
 == Why ratex?
-Dunno, maybe because ruby is japanese? (no offense guys, I can't speek chinese
+Dunno, maybe because ruby is japanese? (no offense guys, I don't spreak chinese
 either)
 
 
