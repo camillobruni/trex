@@ -625,7 +625,12 @@ class RepeatedPageNumberWarning < TexWarning
     def format_warning_message(line, string)
         match = /^l\.[0-9]+ (.*\n.*)/.match(string)[1]
         match.gsub!(/\s*\n\s*/, '')
-        name = /^(.*)\)/.match(string)[1]
+        name = /^(.*)\)/.match(string)
+        if not name.nil?
+            name = name[1]
+        else
+            #fix this
+        end
         "#{name} near: #{match}.\n    #{' '*Math.log(line.to_i).floor}try using plainpages=false or pdfpagelabels in hyperref"
     end
 end
