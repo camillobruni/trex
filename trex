@@ -631,7 +631,8 @@ class RepeatedPageNumberWarning < TexWarning
         else
             #fix this
         end
-        "#{name} near: #{match}.\n    #{' '*Math.log(line.to_i).floor}try using plainpages=false or pdfpagelabels in hyperref"
+        "#{name} near: #{match}.\n    #{' '*Math.log(line.to_i).floor}try using plainpages=false or pdfpagelabels in hyperref
+   see: http://en.wikibooks.org/wiki/LaTeX/Hyperlinks#Problems_with_Links_and_Pages"
     end
 end
 
