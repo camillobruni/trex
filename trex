@@ -102,11 +102,15 @@ class App
 
     # ------------------------------------------------------------------------
     def run
-        if self.parsed_options? && self.arguments_valid? 
-            self.process_arguments            
-            self.process_command
-        else
-            self.output_usage
+        begin
+            if self.parsed_options? && self.arguments_valid? 
+                self.process_arguments            
+                self.process_command
+            else
+                self.output_usage
+            end
+        rescue Interrupt
+            puts ''
         end
     end
     
