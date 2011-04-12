@@ -226,12 +226,12 @@ class App
         def parsed_options?
             # Specify options
             opts = OptionParser.new 
+            opts.on('--hack')          { self.hack }
             opts.on('-v', '--version') { self.output_version; exit 0 }
             opts.on('-h', '--help')    { self.output_help;    exit 0 }
             opts.on('-V', '--verbose') { @options.verbose        = true }
             opts.on('-q', '--quiet')   { @options.quiet          = true }
             opts.on('--figures PATH')  { |path| @options.figures = path }
-            opts.on('--hack')          { @action                 = :hack }
 
             opts.parse!(@arguments) rescue return false
             self.process_options
@@ -293,6 +293,7 @@ class App
         end
 
         def promptChoice(args)
+            args.sort!
             for i in 1..args.length:
                 puts "[#{i}] #{args[i-1]}"
             end
@@ -399,7 +400,7 @@ class TexOutputFormatter
 
           TooManyWarning.new(interestingLimits),
 
-          RepeatedPageNumberWarning.new(interestingLimits),
+          RepeatedPageNumberWarning.new(uninterestingLimits),
           
           TexError.new('Undefined Control Sequence', 
                         /! Undefined control /,
@@ -617,9 +618,8 @@ end
 class RepeatedPageNumberWarning < TexWarning
     def initialize(limits=1)
         super('PDF Repeated Page Number',   
-              /destination with the same identifier \(name\{page\./)
+              /destination with the same identifier \(name\{page\./, limits)
         @additionaInputLines = 4
-        @limit = limit
     end
 
     def format_warning_message(line, string)
