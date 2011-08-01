@@ -36,15 +36,15 @@ GARBAGE = 'log aux out blg pdfsync synctex.gz'
 # ============================================================================
 
 require 'optparse' 
-require 'rdoc/usage'
+require 'rdoc'
 require 'ostruct'
 require 'date'
 require 'logger'  
 require 'open3'
 
-#require 'ruby-debug' 
-#Debugger.start(:post_mortem => true)
-#Debugger.start()
+require 'ruby-debug' 
+Debugger.start(:post_mortem => true)
+Debugger.start()
 
 # ============================================================================
 #TODO track changed files and only recompile then...
@@ -55,14 +55,14 @@ class App
         
     # mapping of input command shortcuts and method names
     VALID_ACTIONS = { 
-        "view",     :view,
-        "compile",  :compile,
-        "tex",      :compile,
-        "count",    :count,
-        "clean",    :clean,
-        "bibtex",   :bibtex,
-        "bib",      :bibtex,
-        "v",        :view,
+        "view" =>    :view,
+        "compile" => :compile,
+        "tex" =>     :compile,
+        "count" =>   :count,
+        "clean" =>   :clean,
+        "bibtex" =>  :bibtex,
+        "bib" =>     :bibtex,
+        "v" =>       :view,
     }
 
     # ------------------------------------------------------------------------
@@ -298,7 +298,7 @@ class App
 
         def promptChoice(args)
             args.sort!
-            for i in 1..args.length:
+            for i in 1..args.length
                 puts "[#{i}] #{args[i-1]}"
             end
             choice = nil
@@ -460,7 +460,7 @@ class TexOutputFormatter
             lineNumberPattern = /lines ([0-9\-]+)/
             @parsed           = true
             mergedLine        = ""
-            lines             = @texOutput.each.entries
+            lines             = @texOutput.split "\n"
             lines.each_with_index { |line,index|
                 #magic to unwrap the autowrapped lines from latex.. silly
                 mergedLine += line.chomp
