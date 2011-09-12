@@ -510,7 +510,7 @@ class TexWarning
     def expand_input(string, index, lines)
         return string if @additionaInputLines == 0
         to = [index + @additionaInputLines, lines.size].min
-        return lines[index..to].to_s
+        return lines[index..to].join("\n") + "\n"
     end
 
     def extract_line(string, index, lines)
