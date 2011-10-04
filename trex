@@ -463,8 +463,8 @@ class TexOutputFormatter
             lines             = @texOutput.split "\n"
             lines.each_with_index { |line,index|
                 #magic to unwrap the autowrapped lines from latex.. silly
-                mergedLine += line.chomp
-                if line.size == 80
+                mergedLine += line
+                if line.size == 79
                     next
                 elsif line.chomp.start_with? "! Undefined"
                     next
