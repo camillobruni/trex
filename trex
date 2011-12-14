@@ -42,9 +42,9 @@ require 'date'
 require 'logger'  
 require 'open3'
 
-require 'ruby-debug' 
-Debugger.start(:post_mortem => true)
-Debugger.start()
+# require 'ruby-debug' 
+# Debugger.start(:post_mortem => true)
+# Debugger.start()
 
 # ============================================================================
 #TODO track changed files and only recompile then...
@@ -164,7 +164,6 @@ class App
         formatter = TexOutputFormatter.new(`#{baseCommand}`, 
                                            @options.verbose, @options.quiet, 
                                            @options.source)
-        formatter.add OtherWarning.new
         formatter.print if not @options.quiet
         return true
     end
@@ -377,6 +376,7 @@ class TexOutputFormatter
         uninterestingLimits = 50 if @verbose
         return unless @errorGroups.nil?
 
+        @filestate         = FilenameParser.new
         @citationWarnings  = CitationWarning.new(interestingLimits)
         @referenceWarnings = ReferenceWarning.new(interestingLimits)
         @errorGroups = [
@@ -425,7 +425,12 @@ class TexOutputFormatter
           MultipleLabelWarning.new(@source, interestingLimits),
 
           TexError.new('Other Errors', /^! /, /.*/, interestingLimits),
+
+          @filestate,
+
+          OtherWarning.new,
         ]
+        @errorGroups.each { |eg| eg.filestate = @filestate }
     end
 
     # ------------------------------------------------------------------------
@@ -442,6 +447,7 @@ class TexOutputFormatter
     # ------------------------------------------------------------------------
     
     def add(handler)
+        handler.filestate = @filestate
         @errorGroups.push handler
     end
 
@@ -485,6 +491,7 @@ end
 # ============================================================================
 class TexWarning
     attr_reader :limit
+    attr_accessor :filestate
 
     def initialize(name, pattern, printPattern=/.*/, limit=10, 
                    additionaInputLines=0)
@@ -522,7 +529,8 @@ class TexWarning
 
     def add_error(line, string)
         return if self.has_error?(line, string)
-        @errors.push([line.to_s, string.to_s])
+        line = @filestate.state + line.to_s unless line == "-"
+        @errors.push([line, string.to_s])
         @maxLinesWidth = [@maxLinesWidth, line.size].max
     end
 
@@ -582,6 +590,63 @@ class TexWarning
     
     def empty?
         self.size == 0
+    end
+end
+
+class FilenameParser
+    def initialize
+        @nesting = []
+    end
+    def filestate=(state)
+    end
+    def handle(string, index, lines)
+        unless string =~ /^\([\.\/]/ || string =~ /^\[[^\]]/ || string =~ /^\)/
+            return false
+        end
+        self.parse(string)
+        return true
+    end
+
+    def parse(string)
+        while string and string != ""
+
+            if string =~ /^\s+(.*)/
+                string = $1
+            end
+
+            break unless string
+
+            if string =~ /^\[[^\]]+\](.*)/
+                string = $1
+                next
+            end
+
+            if string =~ /^(\)+)(.*)/
+                $1.size.times { @nesting.pop }
+                break unless $2
+                string = $2[1,$2.size]
+                next
+            end
+
+            if string =~ /^\(([^\(\)]+)(.*)/
+                @nesting.push($1)
+                string = $2
+                next
+            end
+
+            break
+        end
+    end
+
+    def empty?
+        return true
+    end
+
+    def state
+        if @nesting.size == 1
+            return ""
+        end
+        return @nesting[1,@nesting.size].join("|") + ": "
     end
 end
 
@@ -751,12 +816,12 @@ class TexError < TexWarning
     def extract_line(string, index, lines)
         match =  /(?:line(?:s)? |l.)([0-9\-]+( \\.*)?)/
         if string =~ match           
-            return $1
+            return $1.to_s
         end
         (index+1).upto(lines.size-1) { |i|
             return "-" if lines[i].start_with? "!"
             if lines[i] =~ match
-                return $1
+                return $1.to_s
             end
         }
         return "-"
