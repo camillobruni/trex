@@ -23,8 +23,8 @@
 #   --figures           Set the figures dir, default is './figures'
 #   --hack              Open this script for direct changes in the sources
 #
-# == Author
-#   Camillo Bruni 
+# == Authors
+#   Camillo Bruni, Toon Verwaest
 #
 
 # ============================================================================
@@ -49,7 +49,7 @@ require 'open3'
 # ============================================================================
 #TODO track changed files and only recompile then...
 class App
-    VERSION = '0.0.7'
+    VERSION = '0.9'
     
     attr_reader :options
         
