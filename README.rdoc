@@ -13,13 +13,13 @@ to compile and view the generated pdf. If there are multiple files +trex+ will
 prompt for the correct one.
 
 == Installation
-Just put +trex+ in your executable path, for instance (<tt>/usr/local/bi</tt>).
+Just put +trex+ in your executable path, for instance (<tt>/usr/local/bin</tt>).
 
 == Why trex?
 ratex was too long.
 
 == Why ratex?
-Dunno, maybe because ruby is japanese? (no offense guys, I don't spreak chinese
+Dunno, maybe because ruby is japanese? (no offense guys, I don't speak chinese
 either)
 
 
