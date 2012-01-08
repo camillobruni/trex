@@ -628,7 +628,7 @@ class FilenameParser
                 next
             end
 
-            if string =~ /^\(([^\(\)]+)(.*)/
+            if string =~ /^\(([^\(\)\[]+)(.*)/
                 @nesting.push($1)
                 string = $2
                 next
@@ -700,7 +700,7 @@ class RepeatedPageNumberWarning < TexWarning
         else
             #fix this
         end
-        "#{name} near: #{match}.\n    #{' '*Math.log(line.to_i).floor}try using plainpages=false or pdfpagelabels in hyperref
+        "#{line.to_i == 0?"\n":""}#{name} near: #{match}.\n#{line.to_i == 0?"":" "*Math.log(line.to_i).floor} try using plainpages=false or pdfpagelabels in hyperref
    see: http://en.wikibooks.org/wiki/LaTeX/Hyperlinks#Problems_with_Links_and_Pages"
     end
 end
