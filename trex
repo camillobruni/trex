@@ -700,7 +700,14 @@ class RepeatedPageNumberWarning < TexWarning
         else
             #fix this
         end
-        "#{line.to_i == 0?"\n":""}#{name} near: #{match}.\n#{line.to_i == 0?"":" "*Math.log(line.to_i).floor} try using plainpages=false or pdfpagelabels in hyperref
+        if line.to_i == 0
+            prefix = "\n"
+            separator = ""
+        else
+            prefix = ""
+            separator = " "*Math.log(line.to_i).floor
+        end
+        "#{prefix} near: #{match}.\n#{separator} try using plainpages=false or pdfpagelabels in hyperref
    see: http://en.wikibooks.org/wiki/LaTeX/Hyperlinks#Problems_with_Links_and_Pages"
     end
 end
