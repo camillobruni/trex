@@ -527,9 +527,13 @@ class TexWarning
         return "-"
     end
 
+    def render_line(line)
+        (@filestate and @filestate.state or "") + line.to_s
+    end
+
     def add_error(line, string)
         return if self.has_error?(line, string)
-        line = @filestate.state + line.to_s unless line == "-"
+        line = render_line(line) unless line == "-"
         @errors.push([line, string.to_s])
         @maxLinesWidth = [@maxLinesWidth, line.size].max
     end
