@@ -1,19 +1,19 @@
 #!/usr/bin/env ruby 
 
 # == Synopsis 
-#   rtex is script simplifying the compilation of latex files by creating
-#   proper human-readable error output with repeating patters. Unlike the
+#   trex is script simplifying the compilation of latex files by creating
+#   proper human-readable error output with repeating patterns. Unlike the
 #   original latex output which is oververbosified.
 #
 # == Examples
-#   ./rtex view     # compiles and opens the pdf, equivalent to just ./rtex
-#   ./rtex clean    # removes all generated files
-#   ./rtex tex      # compiles the latex sources
-#   ./rtex count    # gives different word approximations of the latex file
+#   ./trex view     # compiles and opens the pdf, equivalent to just ./trex
+#   ./trex clean    # removes all generated files
+#   ./trex tex      # compiles the latex sources
+#   ./trex count    # gives different word approximations of the latex file
 #
 # == Usage 
-#   rtex [options] [view|compile|tex|clean] 
-#   For help use: rtex -h
+#   trex [options] [view|compile|tex|clean] 
+#   For help use: trex -h
 #
 # == Options
 #   -h, --help          Displays help message
