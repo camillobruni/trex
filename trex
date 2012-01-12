@@ -42,8 +42,8 @@ require 'date'
 require 'logger'  
 require 'open3'
 
-# require 'ruby-debug' 
-# Debugger.start(:post_mortem => true)
+#require 'ruby-debug19' 
+#Debugger.start(:post_mortem => true)
 # Debugger.start()
 
 # ============================================================================
@@ -396,6 +396,11 @@ class TexOutputFormatter
                          /Warning:.*?float specifier changed to/,
                          /float specifier .*/, 
                          uninterestingLimits),
+                         
+          TexWarning.new('Package Warning',        
+                         /Package .* Warning/,
+                         /.*/, 
+                         uninterestingLimits),
         
 
           FontWarning.new(uninterestingLimits),
@@ -521,8 +526,12 @@ class TexWarning
     end
 
     def extract_line(string, index, lines)
-        if string =~ /(?:line(?:s)? |l.)([0-9\-]+)/
-            return $1
+        # force 'line ..' first
+        if /line(?:s)? (?<line>[0-9\-]+)/ =~ string
+            return line
+        end
+        if  /(?:line(?:s)? |l[^0-9])(?<line>[0-9\-]+)/ =~ string
+            return line
         end
         return "-"
     end
@@ -532,8 +541,8 @@ class TexWarning
     end
 
     def add_error(line, string)
-        return if self.has_error?(line, string)
-        line = render_line(line) unless line == "-"
+        return if self.has_error?(line, string) # avoid duplicate errors
+        line = self.render_line(line) unless line == "-"
         @errors.push([line, string.to_s])
         @maxLinesWidth = [@maxLinesWidth, line.size].max
     end
@@ -738,10 +747,15 @@ class BibtexWarning < TexWarning
 end
 
 class CitationWarning < TexWarning
-    def initialize(limits=10)
-        super('Citation Warnings',    
-              /natbib Warning: Citation|Citation /,
-              /[^ ]+ on page [0-9]+ undefined/, limits)
+    def initialize(limit=10)
+        super('Citation Undefined',    
+              pattern=/Warning: Citation/,
+              printPattern=/Citation (?<citation>[^ ]+).*on page (?<page>[0-9]+) undefined/, limit=limit)
+    end
+
+    def format_warning_message(line, string)
+        matched = @printPattern.match string
+        "#{matched[:citation][1..-2]} (output page #{matched[:page]})"
     end
 end
 
