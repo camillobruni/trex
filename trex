@@ -690,7 +690,7 @@ class FilenameParser
     end
 
     def state
-        if @nesting.size == 1
+        if @nesting.size <= 1
             return ""
         end
         return @nesting[1,@nesting.size].join("|") + ": "
