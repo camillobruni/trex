@@ -1,10 +1,8 @@
 = TREX
 
-== Summary
-
 Have you ever been annoyed by the endless lasting stream of warnings and errors
-of +pdflatex+? Have you ever been annoyed by the inconsistent labelling of the 
-erroneous line? *Trex* is the solution for commandline +pdflatex+ compilation
+of +pdflatex+? Have you ever been annoyed by the inconsistent labelling of the
+erroneous line? *Trex* is the solution for commandline +pdflatex+ compilation.
 
 == Usage
 If you have only one tex file in the current dir then you can simply do:
@@ -13,19 +11,11 @@ to compile and view the generated pdf. If there are multiple files +trex+ will
 prompt for the correct one.
 
 == Installation
-Just put +trex+ in your executable path, for instance (<tt>/usr/local/bin</tt>).
-
-== Why trex?
-ratex was too long.
-
-== Why ratex?
-Dunno, maybe because ruby is japanese? (no offense guys, I don't speak chinese
-either)
-
+Just put +trex+ in your executable path, for instance +/usr/local/bin+.
 
 == Executable
- Usage: 
-    trex [options] [view|compile|tex|clean] 
+ Usage:
+    trex [options] [view|compile|tex|clean]
     For help use: trex -h
 
  Options:
@@ -36,3 +26,9 @@ either)
     --figures           Set the figures dir, default is './figures'
     --hack              Open this script for direct changes in the sources
 
+== Why trex?
+ratex was too long.
+
+== Why ratex?
+Dunno, maybe because ruby is japanese? (no offense guys, I don't speak chinese
+either).
