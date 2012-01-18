@@ -1,6 +1,6 @@
-#!/usr/bin/env ruby 
+#!/usr/bin/env ruby
 
-# == Synopsis 
+# == Synopsis
 #   trex is script simplifying the compilation of latex files by creating
 #   proper human-readable error output with repeating patterns. Unlike the
 #   original latex output which is oververbosified.
@@ -11,8 +11,8 @@
 #   ./trex tex      # compiles the latex sources
 #   ./trex count    # gives different word approximations of the latex file
 #
-# == Usage 
-#   trex [options] [view|compile|tex|clean] 
+# == Usage
+#   trex [options] [view|compile|tex|clean]
 #   For help use: trex -h
 #
 # == Options
@@ -35,14 +35,14 @@ GARBAGE = 'log aux out blg pdfsync synctex.gz'
 
 # ============================================================================
 
-require 'optparse' 
+require 'optparse'
 require 'rdoc'
 require 'ostruct'
 require 'date'
-require 'logger'  
+require 'logger'
 require 'open3'
 
-#require 'ruby-debug19' 
+#require 'ruby-debug19'
 #Debugger.start(:post_mortem => true)
 # Debugger.start()
 
@@ -50,11 +50,11 @@ require 'open3'
 #TODO track changed files and only recompile then...
 class App
     VERSION = '0.9'
-    
+
     attr_reader :options
-        
+
     # mapping of input command shortcuts and method names
-    VALID_ACTIONS = { 
+    VALID_ACTIONS = {
         "view" =>    :view,
         "compile" => :compile,
         "tex" =>     :compile,
@@ -104,8 +104,8 @@ class App
     # ------------------------------------------------------------------------
     def run
         begin
-            if self.parsed_options? && self.arguments_valid? 
-                self.process_arguments            
+            if self.parsed_options? && self.arguments_valid?
+                self.process_arguments
                 self.process_command
             else
                 self.output_usage
@@ -114,7 +114,7 @@ class App
             puts ''
         end
     end
-    
+
     # ------------------------------------------------------------------------
     def hack
         editor = ENV['EDITOR'] || "vim"
@@ -129,14 +129,14 @@ class App
             `rm -f #{@options.sourceBase}.#{f}`
         }
     end
-    
+
     # ------------------------------------------------------------------------
     def compile
         self.check_commands
         self.check_source
         baseCommand = self.create_compile_baseCommand
         # 1/4 first run interactive... ignoring cite/ref errors
-        formatter = TexOutputFormatter.new(`#{baseCommand}`, 
+        formatter = TexOutputFormatter.new(`#{baseCommand}`,
                                            @options.verbose, @options.quiet,
                                            @options.source)
         if not formatter.hasCitationWarnings? \
@@ -148,7 +148,7 @@ class App
         if formatter.hasCitationWarnings? and not self.bibtex \
            and not @options.quiet
             # obviously something went wrong in either compiling bibtex or the
-            # latex file itself. Print everything except for reference and 
+            # latex file itself. Print everything except for reference and
             # citation warnings
             errorGroups = formatter.errorGroups
             errorGroups.delete formatter.referenceWarnings
@@ -162,8 +162,8 @@ class App
             return false
         end
         # 4/4 looking for ref/cite errors
-        formatter = TexOutputFormatter.new(`#{baseCommand}`, 
-                                           @options.verbose, @options.quiet, 
+        formatter = TexOutputFormatter.new(`#{baseCommand}`,
+                                           @options.verbose, @options.quiet,
                                            @options.source)
         formatter.print if not @options.quiet
         return true
@@ -195,7 +195,7 @@ class App
             open = 'open'
         end
         if open.nil?
-            "\n no command found to open #{ @options.output} !\n".error 1 
+            "\n no command found to open #{ @options.output} !\n".error 1
         end
         system("#{open} #{@options.output}")
     end
@@ -207,7 +207,7 @@ class App
         puts 'Sources'.red + ":"
         self.print_wc_results `wc #{@options.source}`
         puts 'PDFtoText'.red + ":"
-        #TODO create a tmp file instead of saving locally 
+        #TODO create a tmp file instead of saving locally
         self.print_wc_results `pdftotext -enc UTF-8 -nopgbrk #{@options.output} - | wc`
         `rm -f #{@options.sourceBase}.txt`
         if self.has_command? 'texcount'
@@ -218,7 +218,7 @@ class App
 
     def print_wc_results(result)
         result = result.split()[0..2]
-        max    = result.map{|l| l.size}.max 
+        max    = result.map{|l| l.size}.max
         puts "    #{result[0].rjust(max).yellow} lines"
         puts "    #{result[1].rjust(max).yellow} words"
         puts "    #{result[2].rjust(max).yellow} characters"
@@ -275,9 +275,9 @@ class App
         # True if required arguments were provided
         def arguments_valid?
             return false if not @action and not VALID_ACTIONS.keys.include? @arguments[0]
-            true 
+            true
         end
-    
+
         # Setup the arguments
         def process_arguments
             if not @action or VALID_ACTIONS.keys.include? @arguments[0]
@@ -358,7 +358,7 @@ class App
         end
 
         # ---------------------------------------------------------------------
-        def has_command?(command)	
+        def has_command?(command)
             # disable warnings during the script checking, so we get only
             # errors in stderr. Warnings can cause problems during the
             # detection, for example ( warning: Insecure world writable dir
@@ -411,51 +411,51 @@ class TexOutputFormatter
         @errorGroups = [
           PDFVersionMismatchWarning.new(uninterestingLimits),
 
-          TexWarning.new('Underfull lines',      
-                         /Underfull.*/, 
-                         /\(badness [0-9]+\) in \w+/, 
+          TexWarning.new('Underfull lines',
+                         /Underfull.*/,
+                         /\(badness [0-9]+\) in \w+/,
                          uninterestingLimits),
 
-          TexWarning.new('Overfull lines',       
-                         /Overfull.*/, 
-                         /\w+ \(.*?\) in \w+/, 
+          TexWarning.new('Overfull lines',
+                         /Overfull.*/,
+                         /\w+ \(.*?\) in \w+/,
                          uninterestingLimits),
 
-          TexWarning.new('Float changes',        
+          TexWarning.new('Float changes',
                          /Warning:.*?float specifier changed to/,
-                         /float specifier .*/, 
+                         /float specifier .*/,
                          uninterestingLimits),
-                         
-          TexWarning.new('Package Warning',        
+
+          TexWarning.new('Package Warning',
                          /Package .* Warning/,
-                         /.*/, 
+                         /.*/,
                          uninterestingLimits),
-        
+
 
           FontWarning.new(uninterestingLimits),
-          
+
           @citationWarnings, @referenceWarnings,
 
           TooManyWarning.new(interestingLimits),
 
           RepeatedPageNumberWarning.new(uninterestingLimits),
-          
-          TexError.new('Undefined Control Sequence', 
+
+          TexError.new('Undefined Control Sequence',
                         /! Undefined control /,
                         /\\.*/, interestingLimits),
-          
-          TexError.new('LaTeX error', /! LaTeX Error/, /.*/, 
+
+          TexError.new('LaTeX error', /! LaTeX Error/, /.*/,
                         interestingLimits),
-          
+
           MissingParenthesisWarning.new(@source, interestingLimits),
 
           PharagraphEndedWarning.new(@source, interestingLimits),
 
-          TexWarning.new('File not Found',       
+          TexWarning.new('File not Found',
                          /Warning: File/,
-                         /[^ ]+ not found/, 
+                         /[^ ]+ not found/,
                          interestingLimits),
-                         
+
           MultipleLabelWarning.new(@source, interestingLimits),
 
           TexError.new('Other Errors', /^! /, /.*/, interestingLimits),
@@ -477,9 +477,9 @@ class TexOutputFormatter
         self.parse unless @parsed
         not @referenceWarnings.empty?
     end
-    
+
     # ------------------------------------------------------------------------
-    
+
     def add(handler)
         handler.filestate = @filestate
         @errorGroups.push handler
@@ -493,7 +493,7 @@ class TexOutputFormatter
             end
         }
     end
-    
+
     # ------------------------------------------------------------------------
     protected
         def parse
@@ -527,7 +527,7 @@ class TexWarning
     attr_reader :limit
     attr_accessor :filestate
 
-    def initialize(name, pattern, printPattern=/.*/, limit=10, 
+    def initialize(name, pattern, printPattern=/.*/, limit=10,
                    additionaInputLines=0)
         @name                     = name
         @pattern                  = pattern
@@ -588,7 +588,7 @@ class TexWarning
             return ""
         end
         self.sort
-        limit = [@limit, @errors.size].min 
+        limit = [@limit, @errors.size].min
         str   = @name.redb + " [#{@errors.size}]: "
         str   += "\n" #if self.size > 1 and limit > 0
         limit.times { |i|
@@ -609,7 +609,7 @@ class TexWarning
     def format_warning_message(line, string)
         if @printPattern.instance_of? Proc
             puts self.class, @name
-            return @printPattern.call(line, string)  
+            return @printPattern.call(line, string)
         end
         matched = @printPattern.match string
         return string if not matched
@@ -620,7 +620,7 @@ class TexWarning
         # magic from
         # http://www.bofh.org.uk/2007/12/16/comprehensible-sorting-in-ruby
         # for number sensible sorting
-        @errors.sort_by {|k| 
+        @errors.sort_by {|k|
             k.to_s.split(/((?:(?:^|\s)[-+])?(?:\.\d+|\d+(?:\.\d+?(?:[eE]\d+)?(?:$|(?![eE\.])))?))/ms).
                 map {|v| Float(v) rescue v.downcase}
         }
@@ -629,7 +629,7 @@ class TexWarning
     def size
         @errors.size
     end
-    
+
     def empty?
         self.size == 0
     end
@@ -694,7 +694,7 @@ end
 
 class OtherWarning < TexWarning
     def initialize(limits=10)
-        super('Other Warnings', /LaTeX Warning:/, 
+        super('Other Warnings', /LaTeX Warning:/,
               /[^(LaTeX Warning)].*/, limits)
     end
 end
@@ -728,7 +728,7 @@ end
 
 class RepeatedPageNumberWarning < TexWarning
     def initialize(limits=1)
-        super('PDF Repeated Page Number',   
+        super('PDF Repeated Page Number',
               /destination with the same identifier \(name\{page\./, limits)
         @additionaInputLines = 4
     end
@@ -769,7 +769,7 @@ end
 
 class BibtexWarning < TexWarning
     def initialize(limits=10)
-        super('Bibtex Warnings',    
+        super('Bibtex Warnings',
               /I found no/,
               /I f.*? command/, limits)
     end
@@ -777,7 +777,7 @@ end
 
 class CitationWarning < TexWarning
     def initialize(limit=10)
-        super('Citation Undefined',    
+        super('Citation Undefined',
               pattern=/Warning: Citation/,
               printPattern=/Citation (?<citation>[^ ]+).*on page (?<page>[0-9]+) undefined/, limit=limit)
     end
@@ -790,21 +790,21 @@ end
 
 class ReferenceWarning < TexWarning
     def initialize(limits=1)
-        super('Reference Warnings',   
+        super('Reference Warnings',
               /Warning: Reference/,
               /[^ ]+ on page [0-9]+ undefined/, limits)
     end
 end
 
 class MissingParenthesisWarning < TexWarning
-    def initialize(source, limits=10)    
-        super('Missing Parenthesis', 
-              /File ended /, /[^! ].*/, 
+    def initialize(source, limits=10)
+        super('Missing Parenthesis',
+              /File ended /, /[^! ].*/,
               limits)
         @source = source
         @sourceContents = File.read(source)
     end
-    
+
     def extract_line(string, index, lines)
         label = self.format_warning_message(0, string)
         errorSource = Regexp.escape(lines[index - 1].strip()[0..-6])
@@ -821,14 +821,14 @@ class MissingParenthesisWarning < TexWarning
 end
 
 class PharagraphEndedWarning < TexWarning
-    def initialize(source, limits=10)    
-        super('Runaway Argument', 
-              /! Pharagraph ended /, /[^! ].*/, 
+    def initialize(source, limits=10)
+        super('Runaway Argument',
+              /! Pharagraph ended /, /[^! ].*/,
               limits)
         @source = source
         #@sourceContents = File.read(source)
     end
-    
+
     def extract_line__(string, index, lines)
         label = self.format_warning_message(0, string)
         errorSource = Regexp.escape(lines[index - 1].strip()[0..-6])
@@ -846,11 +846,11 @@ end
 
 class MultipleLabelWarning < TexWarning
     def initialize(source, limits=40)
-        super('Multiply defined Labels', /LaTeX Warning: Label.*? multiply/, 
+        super('Multiply defined Labels', /LaTeX Warning: Label.*? multiply/,
               /.*/, limits)
         @source = source
     end
-  
+
     def format_warning_message(line, string)
         string.match(/Label `(.*?)' /)[1]
     end
@@ -869,7 +869,7 @@ class TexError < TexWarning
 
     def extract_line(string, index, lines)
         match =  /(?:line(?:s)? |l.)([0-9\-]+( \\.*)?)/
-        if string =~ match           
+        if string =~ match
             return $1.to_s
         end
         (index+1).upto(lines.size-1) { |i|
@@ -903,7 +903,7 @@ class String
 
     def red
         colorize(self, "[31m")
-    end  
+    end
 
     def redb
         colorize(self, "[31;1m")
@@ -950,4 +950,4 @@ if __FILE__ == $0
     app.run
 end
 
-
+#  vim: set ts=4 sw=4 ts=4 :
