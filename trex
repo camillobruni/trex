@@ -236,6 +236,9 @@ class App
                 opts.banner = "#{executable_name} [options] [view|compile|tex|clean]"
 
                 opts.separator ''
+                opts.separator 'Automate compilation of LaTeX documents, making the output categorized & human-readable.'
+                opts.separator ''
+
                 opts.on '--figures PATH', "Set the figures directory (default #{FIGURES})" do |path|
                     @options.figures = path
                 end
