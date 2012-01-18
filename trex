@@ -365,12 +365,12 @@ class App
             # errors in stderr. Warnings can cause problems during the
             # detection, for example ( warning: Insecure world writable dir
             # /some/path in PATH, mode 040777 )
-		    @warn = $-v
-		    $-v   = nil
+            @warn = $-v
+            $-v   = nil
             Open3.popen3(command+' --help') { |stdin, stdout, stderr|
                 return stderr.read.length == 0
             }
-		    $-v   = @warn
+            $-v   = @warn
             return true
         end
 
@@ -638,11 +638,14 @@ class TexWarning
 end
 
 class FilenameParser
+
     def initialize
         @nesting = []
     end
+
     def filestate=(state)
     end
+
     def handle(string, index, lines)
         unless string =~ /^\([\.\/]/ || string =~ /^\[[^\]]/ || string =~ /^\)/
             return false
