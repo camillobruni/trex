@@ -70,6 +70,7 @@ class App
         @arguments           = arguments
         @stdin               = stdin
         @action              = :compile
+        @opts                = nil
         # Set defaults
         @options             = OpenStruct.new
         @options.verbose     = false
@@ -226,21 +227,46 @@ class App
 
     # ------------------------------------------------------------------------
     protected
-        def parsed_options?
-            # Specify options
-            opts = OptionParser.new 
-            opts.on('--hack')          { self.hack }
-            opts.on('-v', '--version') { self.output_version; exit 0 }
-            opts.on('-h', '--help')    { self.output_help;    exit 0 }
-            opts.on('-V', '--verbose') { @options.verbose        = true }
-            opts.on('-q', '--quiet')   { @options.quiet          = true }
-            opts.on('--figures PATH')  { |path| @options.figures = path }
 
-            opts.parse!(@arguments) rescue return false
-            self.process_options
-            true      
+        # Specify options
+        def option_parser
+            return @opts unless @opts.nil?
+
+            @opts = OptionParser.new do |opts|
+                opts.banner = "#{executable_name} [options] [view|compile|tex|clean]"
+
+                opts.separator ''
+                opts.on '--figures PATH', "Set the figures directory (default #{FIGURES})" do |path|
+                    @options.figures = path
+                end
+                opts.on '-V', '--verbose', 'List all errors (overrides --quiet)' do
+                    @options.verbose = true
+                end
+                opts.on '-q', '--quiet', 'Output as little as possible (overrides --verbose)' do
+                    @options.quiet = true
+                end
+
+                opts.separator ''
+                opts.on '-h', '--help', 'Display this help message' do
+                    self.output_help
+                    exit 0
+                end
+                opts.on '-v', '--version', 'Show version' do
+                    self.output_version
+                    exit 0
+                end
+                opts.on '--hack', 'Open this script for direct changes in the sources' do
+                    self.hack
+                end
+            end
         end
-        
+
+        def parsed_options?
+            option_parser.parse!(@arguments) rescue return false
+            self.process_options
+            true
+        end
+
         # Performs post-parse processing on options
         def process_options
             @options.verbose = false if @options.quiet
@@ -267,23 +293,26 @@ class App
             end
             'Source file not set!'.error 1 if @options.source.nil?
         end
-        
+
         # ---------------------------------------------------------------------
-        
-        
+
+        def executable_name
+            File.basename(__FILE__)
+        end
+
         def output_help
             self.output_version
-            RDoc::usage #exits app
+            output_usage
         end
-        
+
         def output_usage
-            RDoc::usage('usage') # gets usage from comments above
+            puts @opts.help
         end
-        
+
         def output_version
-            puts "#{File.basename(__FILE__)} version #{VERSION}"
+            puts "#{executable_name} version #{VERSION}"
         end
-        
+
         # ---------------------------------------------------------------------
         def extract_source_from_current_dir
             texFiles = Dir['*.tex']
