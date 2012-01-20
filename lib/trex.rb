@@ -1,5 +1,3 @@
-#!/usr/bin/env ruby
-
 # == Synopsis
 #   trex is script simplifying the compilation of latex files by creating
 #   proper human-readable error output with repeating patterns. Unlike the
@@ -24,7 +22,7 @@
 #   --hack              Open this script for direct changes in the sources
 #
 # == Authors
-#   Camillo Bruni, Toon Verwaest
+#   Camillo Bruni, Toon Verwaest, Damien Pollet
 #
 
 # ============================================================================
@@ -47,8 +45,8 @@ require 'open3'
 
 # ============================================================================
 #TODO track changed files and only recompile then...
-class App
-    VERSION = '0.9'
+class TReX
+    VERSION = '1.0.1'
 
     attr_reader :options
 
@@ -946,13 +944,6 @@ class String
         colorize(self, "[36;1m")
     end
 
-end
-
-# ===========================================================================
-
-if __FILE__ == $0
-    app = App.new(ARGV, STDIN)
-    app.run
 end
 
 #  vim: set ts=4 sw=4 ts=4 :
