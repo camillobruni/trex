@@ -38,6 +38,26 @@ require 'ostruct'
 require 'date'
 require 'logger'
 require 'open3'
+require 'term/ansicolor'
+
+class String
+    include Term::ANSIColor
+    
+    def error(exitValue=nil)
+        puts self.red.bold
+        exit exitValue unless exitValue.nil?
+    end
+end
+
+def color_terminal?
+    return true if STDOUT.isatty
+    [/linux/, /xterm.*/, /rxvt.*/].each { |m|
+        return true if ENV['TERM'] =~ m
+    }
+    return false
+end
+
+Term::ANSIColor::coloring = color_terminal?
 
 #require 'ruby-debug19'
 #Debugger.start(:post_mortem => true)
@@ -94,7 +114,7 @@ class TReX
             self.source! @options.source
         end
         return if File.exist?(@options.source)
-        print "File doesn't exist: ".redb, @options.source, "\n"
+        print "File doesn't exist: ".red.bold, @options.source, "\n"
         exit 1
     end
 
@@ -343,7 +363,7 @@ class TReX
                 missing.push(c) unless self.has_command? c
             }
             if not missing.empty?
-                print 'Missing commands for running the script: '.redb
+                print 'Missing commands for running the script: '.red.bold
                 puts missing.join(', ')
                 if RUBY_PLATFORM.include? "linux"
                     puts 'install latex with your favorite package manager'
@@ -589,7 +609,7 @@ class TexWarning
         end
         self.sort
         limit = [@limit, @errors.size].min
-        str   = @name.redb + " [#{@errors.size}]: "
+        str   = @name.red.bold + " [#{@errors.size}]: "
         str   += "\n" #if self.size > 1 and limit > 0
         limit.times { |i|
             str += "    #{self.format_error(@errors[i][0], @errors[i][1])}\n"
@@ -635,6 +655,7 @@ class TexWarning
     end
 end
 
+# ============================================================================
 class FilenameParser
 
     def initialize
@@ -695,6 +716,7 @@ class FilenameParser
     end
 end
 
+# ============================================================================
 class OtherWarning < TexWarning
     def initialize(limits=10)
         super('Other Warnings', /LaTeX Warning:/,
@@ -883,67 +905,6 @@ class TexError < TexWarning
         }
         return "-"
     end
-end
-# ===========================================================================
-
-def color_terminal?
-    [/linux/, /xterm.*/, /rxvt.*/].each { |m|
-        return true if ENV['TERM'] =~ m
-    }
-    return false
-end
-
-def colorize(text, color_code)
-  return "\033#{color_code}#{text}\033[0m" if color_terminal?()
-  return text
-end
-
-class String
-    def error(exitValue=nil)
-        puts self.redb
-        exit exitValue unless exitValue.nil?
-    end
-
-    def red
-        colorize(self, "[31m")
-    end
-
-    def redb
-        colorize(self, "[31;1m")
-    end
-
-    def green
-        colorize(self, "[32m")
-    end
-
-    def greenb
-        colorize(self, "[32;1m")
-    end
-
-    def yellow
-        colorize(self, "[33m")
-    end
-
-    def yellowb
-        colorize(self, "[33;1m")
-    end
-
-    def pink
-        colorize(self, "[35m")
-    end
-
-    def pinkb
-        colorize(self, "[35;1m")
-    end
-
-    def cyan
-        colorize(self, "[36m")
-    end
-
-    def cyanb
-        colorize(self, "[36;1m")
-    end
-
 end
 
 #  vim: set ts=4 sw=4 ts=4 :
