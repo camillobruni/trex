@@ -9,5 +9,5 @@ Gem::Specification.new do |s|
   s.email        = 'camillorbuni@cxg.ch'
   s.files        = ["lib/trex.rb"]
   s.homepage     = "https://github.com/dh83/trex"
-  s.add_dependency('term-ansicolor',  '=> 1.0.7')
+  s.add_dependency('term-ansicolor',  '>= 1.0.7')
 end
