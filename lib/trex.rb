@@ -8,9 +8,10 @@
 #   ./trex clean    # removes all generated files
 #   ./trex tex      # compiles the latex sources
 #   ./trex count    # gives different word approximations of the latex file
+#   ./trex check    # run afterthedeadline / latex checker on the document
 #
 # == Usage
-#   trex [options] [view|compile|tex|clean]
+#   trex [options] [view|compile|tex|clean|check]
 #   For help use: trex -h
 #
 # == Options
@@ -80,6 +81,8 @@ class TReX
         "bibtex" =>  :bibtex,
         "bib" =>     :bibtex,
         "v" =>       :view,
+        "spell" =>   :spell_check,
+        "check" =>   :spell_check,
     }
 
     # ------------------------------------------------------------------------
@@ -243,6 +246,17 @@ class TReX
     end
 
     # ------------------------------------------------------------------------
+    def spell_check
+        self.check_source        
+        # strip all the latex commands using detex
+        detexed = "#{@options.source}_detex.txt"
+        `detex #{@options.source} > #{detexed}`
+        output = `atdtool #{detexed}`
+        `rm #{detexed}`
+        puts output
+    end
+    
+    # ------------------------------------------------------------------------
     protected
 
         # Specify options
@@ -250,7 +264,7 @@ class TReX
             return @opts unless @opts.nil?
 
             @opts = OptionParser.new do |opts|
-                opts.banner = "#{executable_name} [options] [view|compile|tex|clean]"
+                opts.banner = "#{executable_name} [options] [view|compile|tex|clean|spell]"
 
                 opts.separator ''
                 opts.separator 'Automate compilation of LaTeX documents, making the output human-readable.'
