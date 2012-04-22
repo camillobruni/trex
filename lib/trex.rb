@@ -67,7 +67,7 @@ Term::ANSIColor::coloring = color_terminal?
 # ============================================================================
 #TODO track changed files and only recompile then...
 class TReX
-    VERSION = '1.0.3'
+    VERSION = '1.0.4'
 
     attr_reader :options
 
