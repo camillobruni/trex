@@ -247,12 +247,19 @@ class TReX
 
     # ------------------------------------------------------------------------
     def spell_check
-        self.check_source        
+        require 'tempfile'
+        self.check_source 
+
+        detexed = Tempfile.new(@options.source)
         # strip all the latex commands using detex
-        detexed = "#{@options.source}_detex.txt"
-        `detex #{@options.source} > #{detexed}`
-        output = `atdtool #{detexed}`
-        `rm #{detexed}`
+        `detex #{@options.source} > #{detexed.path}`
+
+        # run the spellchecker
+        output = `atdtool #{detexed.path}`
+        output = output.gsub(detexed.path, File.basename(@options.source))
+
+        detexed.unlink
+        
         puts output
     end
     
