@@ -251,20 +251,42 @@ class TReX
         self.check_source 
 
         detexed = Tempfile.new(@options.source)
+        # strip away spell warnings occuring before the \begin{document}
+        documentStartLine = self.detect_document_start_line
         # strip all the latex commands using detex
-        `detex #{@options.source} > #{detexed.path}`
+        `tail -n +#{documentStartLine} #{@options.source} | detex -e stcode,ccode,listing > #{detexed.path}`
 
         # run the spellchecker
         output = `atdtool #{detexed.path}`
         output = output.gsub(detexed.path, File.basename(@options.source))
-
-        detexed.unlink
         
-        puts output
+        detexed.unlink
+        output.lines do |line|
+            if line.match(/^  /)
+                puts line
+            else
+                /(?<file>[^:]+)\:(?<line>\d+)\:(?<rest>.*)/ =~ line
+                print file 
+                print ':'
+                print line.to_i + documentStartLine - 1
+                print ':'
+                puts rest
+            end
+        end
     end
     
     # ------------------------------------------------------------------------
     protected
+  
+        def detect_document_start_line
+            lineNumber = 0
+            File.open(@options.source) do |f|
+                f.each_line do |line|
+                    return lineNumber if line.match(/^\\begin{document}/)
+                    lineNumber += 1
+                end
+            end
+        end
 
         # Specify options
         def option_parser
