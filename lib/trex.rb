@@ -67,7 +67,7 @@ Term::ANSIColor::coloring = color_terminal?
 # ============================================================================
 #TODO track changed files and only recompile then...
 class TReX
-    VERSION = '1.0.6'
+    VERSION = '1.0.7'
 
     attr_reader :options
 
@@ -263,16 +263,22 @@ class TReX
         detexed.unlink
         output.lines do |line|
             if line.match(/^  /)
-                puts line
+                print ' '
+                print line.strip
             else
-                /(?<file>[^:]+)\:(?<line>\d+)\:(?<rest>.*)/ =~ line
+                /(?<file>[^:]+)\:(?<line>\d+)\:(?<col>\d+)\:(?<rest>[^"]+)(?<match> "[^"]+")(?<trailing>.*)/ =~ line
+                print "\n"
                 print file 
                 print ':'
                 print line.to_i + documentStartLine - 1
                 print ':'
-                puts rest
+                print col
+                print match
+                print rest
+                print trailing.strip
             end
         end
+        puts ''
     end
     
     # ------------------------------------------------------------------------
