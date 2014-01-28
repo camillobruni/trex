@@ -11,7 +11,7 @@
 #   ./trex check    # run afterthedeadline / latex checker on the document
 #
 # == Usage
-#   trex [options] [view|compile|tex|clean|check]
+#   trex [options] [view|compile|tex|clean|check|count]
 #   For help use: trex -h
 #
 # == Options
@@ -223,18 +223,39 @@ class TReX
     # ------------------------------------------------------------------------
     def count
         @options.quiet = true
+        self.count_wc
+        self.count_texcount
         self.compile
-        puts 'Sources'.red + ":"
-        self.print_wc_results `wc #{@options.source}`
-        puts 'PDFtoText'.red + ":"
-        #TODO create a tmp file instead of saving locally
-        self.print_wc_results `pdftotext -enc UTF-8 -nopgbrk #{@options.output} - | wc`
-        `rm -f #{@options.sourceBase}.txt`
-        if self.has_command? 'texcount'
-            puts 'texcount'.red + ":"
-            puts `texcount -relaxed -sum #{@options.source}`
-        end
+        self.count_pdf_info
+        self.count_pdf_to_text
     end
+
+    def count_wc
+      puts "Source:".red + " #{@options.source}:"
+      self.print_wc_results `wc #{@options.source}`
+    end
+
+    def count_pdf_info
+      rutn unless self.has_command? 'pdfinfo'
+      puts 'PDFInfo'.red + ":"
+      puts `pdfinfo #{@options.output}`
+    end
+
+    def count_pdf_to_text
+      return unless self.has_command? 'pdftotext'
+      puts 'PDFtoText'.red + ":"
+      #TODO create a tmp file instead of saving locally
+      self.print_wc_results `pdftotext -enc UTF-8 -nopgbrk #{@options.output} - | wc`
+      `rm -f #{@options.sourceBase}.txt`
+
+    end
+
+    def count_texcount
+        return unless self.has_command? 'texcount'
+        puts 'texcount'.red + ":"
+        puts `texcount -relaxed -sum -inc -merge -col -sub=chapter #{@options.source} 2> /dev/null`
+    end
+
 
     def print_wc_results(result)
         result = result.split()[0..2]
@@ -300,7 +321,7 @@ class TReX
             return @opts unless @opts.nil?
 
             @opts = OptionParser.new do |opts|
-                opts.banner = "#{executable_name} [options] [view|compile|tex|clean|spell]"
+                opts.banner = "#{executable_name} [options] [view|compile|tex|clean|spell|count]"
 
                 opts.separator ''
                 opts.separator 'Automate compilation of LaTeX documents, making the output human-readable.'
@@ -435,11 +456,9 @@ class TReX
             # /some/path in PATH, mode 040777 )
             @warn = $-v
             $-v   = nil
-            Open3.popen3(command+' --help') { |stdin, stdout, stderr|
-                return stderr.read.length == 0
-            }
+            result = system('type #{command} >/dev/null 2>&1')
             $-v   = @warn
-            return true
+            return result
         end
 
         # ---------------------------------------------------------------------
@@ -958,3 +977,4 @@ class TexError < TexWarning
 end
 
 #  vim: set ts=4 sw=4 ts=4 :
+
